@@ -182,16 +182,25 @@ class Tetris:
     def show_menu(self):
         menu_font = pygame.font.SysFont("Arial", 36)
         selected = 0
-        options = ["Gioca", "Record", "About"]
+        options = ["Gioca", "Record", "About"] 
         while True:
             self.screen.blit(self.background_image, (0, 0))
             for i, option in enumerate(options):
                 color = (255, 0, 0) if i == selected else (255, 255, 255)
                 text = menu_font.render(option, True, color)
-                self.screen.blit(text, (
-                    SCREEN_WIDTH // 2 - text.get_width() // 2,
-                    SCREEN_HEIGHT // 2 + i * 50
-                ))
+                text_border = menu_font.render(option, True, (0, 0, 0))
+
+                x = SCREEN_WIDTH // 2 - text.get_width() // 2
+                y = SCREEN_HEIGHT // 2 + i * 50
+
+                # BORDO spesso (8 direzioni)
+                for dx in [-2, -1, 0, 1, 2]:
+                    for dy in [-2, -1, 0, 1, 2]:
+                        if dx != 0 or dy != 0:
+                            self.screen.blit(text_border, (x + dx, y + dy))
+
+                # Testo principale
+                self.screen.blit(text, (x, y))
 
             pygame.display.flip()
             self.clock.tick(30)
@@ -212,6 +221,7 @@ class Tetris:
                             self.show_record()
                         elif selected == 2:  # About
                             self.show_about()
+
 
     def show_record(self):
         self.screen.fill((0, 0, 0))
@@ -313,8 +323,27 @@ class Tetris:
                     pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
 
     def draw_game_over(self):
-        text = self.font.render("GAME OVER - Press R", True, (255, 0, 0))
-        self.screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2))
+        game_over_text = "GAME OVER"
+        press_r_text = "Press R"
+ 
+        # Render del bordo (testo nero intorno al testo principale rosso)
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    # Bordi neri
+                    border1 = self.font.render(game_over_text, True, (0, 0, 0))
+                    border2 = self.font.render(press_r_text, True, (0, 0, 0))
+                    self.screen.blit(border1, (SCREEN_WIDTH // 2 - border1.get_width() // 2 + dx,
+                                            SCREEN_HEIGHT // 2 - 30 + dy))
+                    self.screen.blit(border2, (SCREEN_WIDTH // 2 - border2.get_width() // 2 + dx,
+                                            SCREEN_HEIGHT // 2 + 10 + dy))
+
+        # Testo principale rosso
+        text1 = self.font.render(game_over_text, True, (255, 255, 0))
+        text2 = self.font.render(press_r_text, True, (255, 0, 0))
+        self.screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 30))
+        self.screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 10))
+
 
     def draw_score(self):
         text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
@@ -349,6 +378,12 @@ class Tetris:
                 if not hasattr(self, 'score_saved'):
                     self.save_highscore()
                     self.score_saved = True
+                
+                highest_score = self.get_highest_score()
+                print(highest_score)
+                self.difficolta = min(highest_score // 100, 10)
+                print("difficoltà")
+                print(self.difficolta) 
 
             pygame.display.flip()
             self.clock.tick(60)
