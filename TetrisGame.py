@@ -1,0 +1,392 @@
+import pygame
+import random
+import sys
+import json
+import math
+# --- Costanti ---
+GRID_WIDTH = 10
+GRID_HEIGHT = 20
+CELL_SIZE = 30
+
+SCREEN_WIDTH = GRID_WIDTH * CELL_SIZE
+SCREEN_HEIGHT = GRID_HEIGHT * CELL_SIZE
+
+HIGHSCORE_FILE = "highscores.json"
+MAX_SCORES = 10
+
+
+SHAPES = [
+    [[1, 1, 1, 1]],  # I
+    [[1, 1], [1, 1]],  # O
+    [[0, 1, 0], [1, 1, 1]],  # T
+    [[1, 1, 0], [0, 1, 1]],  # S
+    [[0, 1, 1], [1, 1, 0]],  # Z
+    [[1, 0, 0], [1, 1, 1]],  # L
+    [[0, 0, 1], [1, 1, 1]]  # J
+]
+
+COLORS = [
+    (0, 255, 255),    # I - cyan
+    (255, 255, 0),    # O - yellow
+    (128, 0, 128),    # T - purple
+    (0, 255, 0),      # S - green
+    (255, 0, 0),      # Z - red
+    (255, 165, 0),    # L - orange
+    (0, 0, 255)       # J - blue
+]
+
+
+class Tetris:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Tetris")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Arial", 24)
+
+         # Caricamento sfondo
+        self.background_image = pygame.image.load("image/sfondo1.jpg").convert()
+        self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+
+        pygame.mixer.init()
+        self.line_sound = pygame.mixer.Sound("sound/boss_cry.ogg")
+
+        self.grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
+        self.score = 0
+        self.game_over = False
+
+        # Imposta difficoltà in base al punteggio massimo
+        highest_score = self.get_highest_score()
+        print(highest_score)
+        self.difficolta = min(highest_score // 100, 10)
+        print("difficoltà")
+        print(self.difficolta) 
+        
+        self.riempi_blocchi_difficolta()
+
+
+        self.new_piece()
+        self.fall_time = 0
+        self.fall_speed = 500  # millisecondi
+
+    def get_highest_score(self):
+        try:
+            with open(HIGHSCORE_FILE, "r") as file:
+                highscores = json.load(file)
+            return max(highscores) if highscores else 0
+        except (FileNotFoundError, json.JSONDecodeError):
+            return 0
+
+
+    def riempi_blocchi_difficolta(self):
+        if self.difficolta <= 0:
+            return
+
+        numero_blocchi = int((GRID_WIDTH * GRID_HEIGHT) * (self.difficolta / 80))  # da 0 a 50% max
+
+        for _ in range(numero_blocchi):
+            x = random.randint(0, GRID_WIDTH - 1)
+            y = random.randint(GRID_HEIGHT // 2, GRID_HEIGHT - 1)  # solo nella metà bassa
+            if self.grid[y][x] == 0:
+                colore_random = random.choice(COLORS)
+                self.grid[y][x] = colore_random
+
+    def show_about(self):
+        self.screen.fill((0, 0, 0))
+        clock = pygame.time.Clock()
+
+        lines = [
+            "TETRIS PYTHON",
+            "Autore: Vincenzo Scozzaro",
+            "Versione: 1.0",
+            "Licenza: GPL",
+            "Contatti: info@example.com",
+            "",
+            "Premi ESC o Invio per tornare"
+        ]
+
+        # Impostazioni per animazione
+        start_y = SCREEN_HEIGHT
+        spacing = 40
+        speed = 1.2  # Velocità di scorrimento
+        base_font_size = 36
+        min_font_size = 16
+
+        # Carica font generico
+        font_name = pygame.font.get_default_font()
+
+        running = True
+        while running:
+            self.screen.fill((0, 0, 0))
+            y = start_y
+            for i, line in enumerate(lines):
+                # Diminuisce la dimensione del font man mano che sale (simula prospettiva)
+                scale = max(min_font_size, base_font_size - int((SCREEN_HEIGHT - y) * 0.03))
+                font = pygame.font.SysFont(font_name, scale)
+                text = font.render(line, True, (255, 255, 0))
+                x = SCREEN_WIDTH // 2 - text.get_width() // 2
+                self.screen.blit(text, (x, int(y)))
+                y += spacing
+
+            pygame.display.flip()
+            clock.tick(60)
+            start_y -= speed
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_ESCAPE, pygame.K_RETURN]:
+                        running = False
+
+            # Quando tutte le righe sono uscite dallo schermo, riavvolgi
+            if y < 0:
+                start_y = SCREEN_HEIGHT
+
+
+    def show_about_old(self):
+        self.screen.fill((0, 0, 0))
+
+        lines = [
+            "TETRIS PYTHON",
+            "Autore: Vincenzo Scozzaro",
+            "Versione: 1.0",
+            "Licenza: GPL",
+            "Contatti: info@example.com",  # opzionale
+            "",
+            "Premi ESC o Invio per tornare"
+        ]
+
+        for i, line in enumerate(lines):
+            text = self.font.render(line, True, (255, 255, 255))
+            self.screen.blit(text, (
+                SCREEN_WIDTH // 2 - text.get_width() // 2,
+                80 + i * 30
+            ))
+
+        pygame.display.flip()
+
+        # Attende pressione di un tasto per uscire
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_ESCAPE, pygame.K_RETURN]:
+                        waiting = False
+
+    def show_menu(self):
+        menu_font = pygame.font.SysFont("Arial", 36)
+        selected = 0
+        options = ["Gioca", "Record", "About"]
+        while True:
+            self.screen.blit(self.background_image, (0, 0))
+            for i, option in enumerate(options):
+                color = (255, 0, 0) if i == selected else (255, 255, 255)
+                text = menu_font.render(option, True, color)
+                self.screen.blit(text, (
+                    SCREEN_WIDTH // 2 - text.get_width() // 2,
+                    SCREEN_HEIGHT // 2 + i * 50
+                ))
+
+            pygame.display.flip()
+            self.clock.tick(30)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        selected = (selected - 1) % len(options)
+                    elif event.key == pygame.K_DOWN:
+                        selected = (selected + 1) % len(options)
+                    elif event.key == pygame.K_RETURN:
+                        if selected == 0:  # Gioca
+                            return  # esce dal menu per iniziare il gioco
+                        elif selected == 1:  # Record
+                            self.show_record()
+                        elif selected == 2:  # About
+                            self.show_about()
+
+    def show_record(self):
+        self.screen.fill((0, 0, 0))
+        highscores = self.load_highscores()
+        title = self.font.render("Top 10 Record", True, (255, 255, 0))
+        self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 50))
+
+        for i, score in enumerate(highscores):
+            text = self.font.render(f"{i+1}. {score}", True, (255, 255, 255))
+            self.screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, 100 + i * 30))
+
+        pygame.display.flip()
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        waiting = False
+
+
+    def new_piece(self):
+        self.piece_index = random.randint(0, len(SHAPES) - 1)
+        self.piece = [row[:] for row in SHAPES[self.piece_index]]
+        self.color = COLORS[self.piece_index]
+        self.piece_x = GRID_WIDTH // 2 - len(self.piece[0]) // 2
+        self.piece_y = 0
+
+        if self.check_collision(self.piece, self.piece_x, self.piece_y):
+            self.game_over = True
+
+    def check_collision(self, piece, offset_x, offset_y):
+        for y, row in enumerate(piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    px = offset_x + x
+                    py = offset_y + y
+                    if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:
+                        return True
+                    if py >= 0 and self.grid[py][px]:
+                        return True
+        return False
+
+    def merge_piece(self):
+        for y, row in enumerate(self.piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    self.grid[self.piece_y + y][self.piece_x + x] = self.color
+
+    def clear_lines(self):
+        new_grid = []
+        lines_cleared = 0
+        for row in self.grid:
+            if 0 not in row:
+                lines_cleared += 1
+            else:
+                new_grid.append(row)
+        for _ in range(lines_cleared):
+            new_grid.insert(0, [0] * GRID_WIDTH)
+        if lines_cleared > 0:
+            self.line_sound.play()
+        self.grid = new_grid
+        self.score += lines_cleared ** 2
+
+    def rotate_piece(self):
+        rotated = [list(row) for row in zip(*self.piece[::-1])]
+        if not self.check_collision(rotated, self.piece_x, self.piece_y):
+            self.piece = rotated
+
+    def move_piece(self, dx, dy):
+        if not self.check_collision(self.piece, self.piece_x + dx, self.piece_y + dy):
+            self.piece_x += dx
+            self.piece_y += dy
+
+    def drop_piece(self):
+        while not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
+            self.piece_y += 1
+        self.merge_piece()
+        self.clear_lines()
+        self.new_piece()
+
+    def draw_grid(self):
+        for y in range(GRID_HEIGHT):
+            for x in range(GRID_WIDTH):
+                rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                pygame.draw.rect(self.screen, (40, 40, 40), rect, 1)
+                cell = self.grid[y][x]
+                if cell:
+                    pygame.draw.rect(self.screen, cell, rect)
+
+    def draw_piece(self):
+        for y, row in enumerate(self.piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    rect = pygame.Rect((self.piece_x + x) * CELL_SIZE, (self.piece_y + y) * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                    pygame.draw.rect(self.screen, self.color, rect)
+                    pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
+
+    def draw_game_over(self):
+        text = self.font.render("GAME OVER - Press R", True, (255, 0, 0))
+        self.screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2))
+
+    def draw_score(self):
+        text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.screen.blit(text, (10, 10))
+
+    def load_highscores(self):
+        try:
+            with open(HIGHSCORE_FILE, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def save_highscore(self):
+        highscores = self.load_highscores()
+        highscores.append(self.score)
+        highscores = sorted(highscores, reverse=True)[:MAX_SCORES]
+        with open(HIGHSCORE_FILE, "w") as f:
+            json.dump(highscores, f)
+
+
+    def run(self):
+        self.show_menu()  # mostra il menu prima di iniziare il gioco
+
+        while True:
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_grid()
+            self.draw_piece()
+            self.draw_score()
+
+            if self.game_over:
+                self.draw_game_over()
+                if not hasattr(self, 'score_saved'):
+                    self.save_highscore()
+                    self.score_saved = True
+
+            pygame.display.flip()
+            self.clock.tick(60)
+            self.fall_time += self.clock.get_time()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.KEYDOWN:
+                    if self.game_over:
+                        if event.key == pygame.K_r:
+                            self.__init__()
+                            self.run()
+                            return
+                    else:
+                        if event.key == pygame.K_LEFT:
+                            self.move_piece(-1, 0)
+                        elif event.key == pygame.K_RIGHT:
+                            self.move_piece(1, 0)
+                        elif event.key == pygame.K_DOWN:
+                            self.move_piece(0, 1)
+                        elif event.key == pygame.K_UP:
+                            self.rotate_piece()
+                        elif event.key == pygame.K_SPACE:
+                            self.drop_piece()
+
+            if not self.game_over and self.fall_time > self.fall_speed:
+                if not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
+                    self.piece_y += 1
+                else:
+                    self.merge_piece()
+                    self.clear_lines()
+                    self.new_piece()
+                self.fall_time = 0
+
+
+
+if __name__ == "__main__":
+    Tetris().run()
