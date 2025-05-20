@@ -68,7 +68,13 @@ class Tetris:
 
         self.new_piece()
         self.fall_time = 0
-        self.fall_speed = 500  # millisecondi
+        #self.fall_speed = 500  # millisecondi
+        # Più alta è la difficoltà, più veloce è la caduta (minore il tempo tra un passo e l'altro)
+        # Difficoltà 0 => 500ms, difficoltà 10 => 150ms (più difficile)
+        self.fall_speed = max(150, 500 - self.difficolta * 35)
+        print(f"Velocità di caduta: {self.fall_speed} ms")
+
+
 
     def get_highest_score(self):
         try:
@@ -340,7 +346,7 @@ class Tetris:
 
         # Testo principale rosso
         text1 = self.font.render(game_over_text, True, (255, 255, 0))
-        text2 = self.font.render(press_r_text, True, (255, 0, 0))
+        text2 = self.font.render(press_r_text, True, (0, 255, 0))
         self.screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 30))
         self.screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 10))
 
