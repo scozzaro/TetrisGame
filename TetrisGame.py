@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import json
+import os
 import math
 # --- Costanti ---
 GRID_WIDTH = 10
@@ -184,6 +185,7 @@ class Tetris:
                 elif event.type == pygame.KEYDOWN:
                     if event.key in [pygame.K_ESCAPE, pygame.K_RETURN]:
                         waiting = False
+                    
 
     def show_menu(self):
         menu_font = pygame.font.SysFont("Arial", 36)
@@ -214,9 +216,12 @@ class Tetris:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
-                    sys.exit()
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_UP:
+                    sys.exit() 
+                elif event.type == pygame.KEYDOWN: 
+                    if event.key == pygame.K_q or event.key == pygame.K_ESCAPE or  event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit() 
+                    elif event.key == pygame.K_UP:
                         selected = (selected - 1) % len(options)
                     elif event.key == pygame.K_DOWN:
                         selected = (selected + 1) % len(options)
@@ -232,6 +237,7 @@ class Tetris:
     def show_record(self):
         self.screen.fill((0, 0, 0))
         highscores = self.load_highscores()
+        
         title = self.font.render("Top 10 Record", True, (255, 255, 0))
         self.screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 50))
 
@@ -239,7 +245,12 @@ class Tetris:
             text = self.font.render(f"{i+1}. {score}", True, (255, 255, 255))
             self.screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, 100 + i * 30))
 
+        # Aggiunta della scritta in basso
+        reset_text = self.font.render("D per Resettare i record", True, (200, 0, 0))
+        self.screen.blit(reset_text, (SCREEN_WIDTH // 2 - reset_text.get_width() // 2, SCREEN_HEIGHT - 50))
+
         pygame.display.flip()
+        
         waiting = True
         while waiting:
             for event in pygame.event.get():
@@ -249,6 +260,33 @@ class Tetris:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         waiting = False
+                    elif event.key == pygame.K_d:
+                         # Cancella l'area in basso
+                        pygame.draw.rect(self.screen, (0, 0, 0), (0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 60))
+                        confirm_font = pygame.font.Font(None, 36)
+                        confirm_text = confirm_font.render("Sei sicuro? S o ESC", True, (255, 0, 0))
+                        self.screen.blit(confirm_text, (SCREEN_WIDTH // 2 - confirm_text.get_width() // 2, SCREEN_HEIGHT - 50))
+                        pygame.display.flip()
+
+                        confirming = True
+                        while confirming:
+                            for confirm_event in pygame.event.get():
+                                if confirm_event.type == pygame.QUIT:
+                                    pygame.quit()
+                                    sys.exit()
+                                elif confirm_event.type == pygame.KEYDOWN:
+                                    if confirm_event.key == pygame.K_s:
+                                        if os.path.exists(HIGHSCORE_FILE):
+                                            os.remove(HIGHSCORE_FILE)
+                                            print("File dei record eliminato.")
+                                        else:
+                                            print("Il file dei record non esiste.")
+                                        confirming = False
+                                        waiting = False  # esci dalla schermata dei record
+                                    elif confirm_event.key == pygame.K_ESCAPE:
+                                        confirming = False  # annulla l'operazione
+
+
 
 
     def new_piece(self):
