@@ -1,106 +1,120 @@
-import pygame
-import random
-import sys
-import json
-import os
-import math
+import pygame          # Libreria per creare videogiochi 2D in Python
+import random          # Per generare numeri casuali (usato per i pezzi e blocchi casuali)
+import sys             # Per uscire dal programma in modo sicuro
+import json            # Per gestire salvataggi e letture di file JSON (classifica)
+import os              # Per operazioni sul file system (es. verifica esistenza file)
+import math            # Per eventuali calcoli matematici (non ancora usato direttamente)
+
 # --- Costanti ---
-GRID_WIDTH = 10
-GRID_HEIGHT = 20
-CELL_SIZE = 30
+GRID_WIDTH = 10        # Numero di colonne nella griglia (standard Tetris)
+GRID_HEIGHT = 20       # Numero di righe nella griglia
+CELL_SIZE = 30         # Dimensione di ogni cella in pixel
 
-SCREEN_WIDTH = GRID_WIDTH * CELL_SIZE
-SCREEN_HEIGHT = GRID_HEIGHT * CELL_SIZE
+SCREEN_WIDTH = GRID_WIDTH * CELL_SIZE   # Larghezza della finestra di gioco in pixel
+SCREEN_HEIGHT = GRID_HEIGHT * CELL_SIZE # Altezza della finestra di gioco in pixel
 
-HIGHSCORE_FILE = "highscores.json"
-MAX_SCORES = 10
+
+HIGHSCORE_FILE = "highscores.json"  # Nome del file per salvare i punteggi
+MAX_SCORES = 10                     # Numero massimo di record salvati
 
 
 SHAPES = [
-    [[1, 1, 1, 1]],  # I
-    [[1, 1], [1, 1]],  # O
-    [[0, 1, 0], [1, 1, 1]],  # T
-    [[1, 1, 0], [0, 1, 1]],  # S
-    [[0, 1, 1], [1, 1, 0]],  # Z
-    [[1, 0, 0], [1, 1, 1]],  # L
-    [[0, 0, 1], [1, 1, 1]]  # J
+    [[1, 1, 1, 1]],                  # Pezzo I
+    [[1, 1], [1, 1]],                # Pezzo O
+    [[0, 1, 0], [1, 1, 1]],          # Pezzo T
+    [[1, 1, 0], [0, 1, 1]],          # Pezzo S
+    [[0, 1, 1], [1, 1, 0]],          # Pezzo Z
+    [[1, 0, 0], [1, 1, 1]],          # Pezzo L
+    [[0, 0, 1], [1, 1, 1]]           # Pezzo J
 ]
 
+
 COLORS = [
-    (0, 255, 255),    # I - cyan
-    (255, 255, 0),    # O - yellow
-    (128, 0, 128),    # T - purple
-    (0, 255, 0),      # S - green
-    (255, 0, 0),      # Z - red
-    (255, 165, 0),    # L - orange
-    (0, 0, 255)       # J - blue
+    (0, 255, 255),    # I - azzurro
+    (255, 255, 0),    # O - giallo
+    (128, 0, 128),    # T - viola
+    (0, 255, 0),      # S - verde
+    (255, 0, 0),      # Z - rosso
+    (255, 165, 0),    # L - arancione
+    (0, 0, 255)       # J - blu
 ]
 
 
 class Tetris:
     def __init__(self):
-        pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Tetris")
-        self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Arial", 24)
+        pygame.init()  # Inizializza pygame
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))  # Crea la finestra di gioco
+        pygame.display.set_caption("Tetris")  # Titolo della finestra
+        self.clock = pygame.time.Clock()  # Oggetto per regolare il frame rate
+        self.font = pygame.font.SysFont("Arial", 24)  # Font di base per i testi
 
          # Caricamento sfondo
-        self.background_image = pygame.image.load("image/sfondo1.jpg").convert()
-        self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.background_image = pygame.image.load("image/sfondo1.jpg").convert()  # Carica immagine di sfondo
+        self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))  # Scala lo sfondo alla finestra
 
 
-        pygame.mixer.init()
-        self.line_sound = pygame.mixer.Sound("sound/boss_cry.ogg")
 
-        self.grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
-        self.score = 0
-        self.game_over = False
+        pygame.mixer.init()  # Inizializza il sistema audio
+        self.line_sound = pygame.mixer.Sound("sound/boss_cry.ogg")  # Carica un suono per la rimozione delle righe
+
+
+        self.grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]  # Griglia di gioco inizialmente vuota (0 = cella vuota)
+        self.score = 0               # Punteggio iniziale
+        self.game_over = False      # Flag di fine gioco
+
 
         # Imposta difficoltà in base al punteggio massimo
-        highest_score = self.get_highest_score()
+        highest_score = self.get_highest_score()  # Recupera il punteggio più alto
         print(highest_score)
-        self.difficolta = min(highest_score // 100, 10)
+        self.difficolta = min(highest_score // 100, 10)  # Calcola la difficoltà: massimo 10
         print("difficoltà")
         print(self.difficolta) 
+
         
-        self.riempi_blocchi_difficolta()
+        self.riempi_blocchi_difficolta()  # Riempie la griglia con blocchi casuali in base alla difficoltà
 
 
-        self.new_piece()
-        self.fall_time = 0
+
+        self.new_piece()           # Genera il primo pezzo
+        self.fall_time = 0        # Tempo accumulato per far cadere il pezzo
+
         #self.fall_speed = 500  # millisecondi
         # Più alta è la difficoltà, più veloce è la caduta (minore il tempo tra un passo e l'altro)
         # Difficoltà 0 => 500ms, difficoltà 10 => 150ms (più difficile)
-        self.fall_speed = max(150, 500 - self.difficolta * 35)
+
+        self.fall_speed = max(150, 500 - self.difficolta * 35)  # Velocità di caduta: più alta la difficoltà, più veloce
         print(f"Velocità di caduta: {self.fall_speed} ms")
+
 
 
 
     def get_highest_score(self):
         try:
-            with open(HIGHSCORE_FILE, "r") as file:
-                highscores = json.load(file)
-            return max(highscores) if highscores else 0
+            with open(HIGHSCORE_FILE, "r") as file:  # Apre il file dei punteggi
+                highscores = json.load(file)         # Carica i dati JSON
+            return max(highscores) if highscores else 0  # Ritorna il punteggio massimo, o 0 se vuoto
         except (FileNotFoundError, json.JSONDecodeError):
-            return 0
+            return 0  # Se il file non esiste o è danneggiato, ritorna 0
+
 
 
     def riempi_blocchi_difficolta(self):
         if self.difficolta <= 0:
-            return
+            return  # Se difficoltà zero, non fa nulla
 
-        numero_blocchi = int((GRID_WIDTH * GRID_HEIGHT) * (self.difficolta / 80))  # da 0 a 50% max
+        numero_blocchi = int((GRID_WIDTH * GRID_HEIGHT) * (self.difficolta / 80))  # Calcola quanti blocchi casuali inserire
+
 
         for _ in range(numero_blocchi):
-            x = random.randint(0, GRID_WIDTH - 1)
-            y = random.randint(GRID_HEIGHT // 2, GRID_HEIGHT - 1)  # solo nella metà bassa
-            if self.grid[y][x] == 0:
-                colore_random = random.choice(COLORS)
-                self.grid[y][x] = colore_random
+            x = random.randint(0, GRID_WIDTH - 1)  # Posizione x casuale
+            y = random.randint(GRID_HEIGHT // 2, GRID_HEIGHT - 1)  # y solo nella metà bassa della griglia
+            if self.grid[y][x] == 0:  # Se cella vuota
+                colore_random = random.choice(COLORS)  # Colore casuale
+                self.grid[y][x] = colore_random  # Inserisce blocco colorato nella griglia
+
 
     def show_about(self):
-        self.screen.fill((0, 0, 0))
+        self.screen.fill((0, 0, 0))  # Sfondo nero
         clock = pygame.time.Clock()
 
         lines = [
