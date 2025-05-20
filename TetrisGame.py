@@ -364,13 +364,14 @@ class Tetris:
         self.new_piece()
 
     def draw_grid(self):
-        for y in range(GRID_HEIGHT):
+        for y in range(GRID_HEIGHT): 
             for x in range(GRID_WIDTH):
-                rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                pygame.draw.rect(self.screen, (40, 40, 40), rect, 1)
                 cell = self.grid[y][x]
-                if cell:
-                    pygame.draw.rect(self.screen, cell, rect)
+                if cell != 0:
+                    rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                    pygame.draw.rect(self.screen, cell, rect)                 # disegna il blocco
+                    pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)         # disegna bordo
+
 
     def draw_piece(self):
         for y, row in enumerate(self.piece):
