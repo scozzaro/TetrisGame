@@ -61,6 +61,7 @@ class Tetris:
 
         # --- Carica immagini e suoni usando la funzione resource_path ---
         self.background_image = pygame.image.load(resource_path(os.path.join("image", "sfondo1.jpg"))).convert()
+        # Lo sfondo dovrebbe riempire l'intero schermo
         self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
         pygame.mixer.init()
@@ -69,9 +70,15 @@ class Tetris:
         self.grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
         self.score = 0
         self.game_over = False
-        self.score_saved = False # Aggiunto per tracciare se il punteggio è già stato salvato
+        self.score_saved = False
 
-        # Imposta difficoltà in base al punteggio massimo
+        # --- NUOVO: Crea una superficie separata per la griglia di gioco ---
+        # Questa superficie conterrà solo la griglia di Tetris stessa
+        self.game_surface_width = GRID_WIDTH * CELL_SIZE
+        self.game_surface_height = GRID_HEIGHT * CELL_SIZE
+        self.game_surface = pygame.Surface((self.game_surface_width, self.game_surface_height), pygame.SRCALPHA) # Usa SRCALPHA per la trasparenza
+        # --- FINE NUOVO ---
+
         highest_score = self.get_highest_score()
         print(f"Punteggio più alto caricato: {highest_score}")
         self.difficolta = min(highest_score // 100, 10)
@@ -79,6 +86,10 @@ class Tetris:
 
         self.riempi_blocchi_difficolta()
 
+        self.next_piece_index = None
+        self.next_piece = None
+        self.next_color = None
+        self.generate_next_piece()
         self.new_piece()
         self.fall_time = 0
 
@@ -92,11 +103,22 @@ class Tetris:
 
         while input_active:
             self.screen.fill((0, 0, 0))
-            prompt = font.render("Game Over! Inserisci il tuo nome:", True, (255, 255, 255))
+            
+            # Prima riga del messaggio
+            prompt_line1 = font.render("Game Over!", True, (255, 255, 255))
+            # Seconda riga del messaggio
+            prompt_line2 = font.render("Inserisci il tuo nome:", True, (255, 255, 255))
+            
             name_text = font.render(name + "|", True, (255, 255, 0))
 
-            self.screen.blit(prompt, (SCREEN_WIDTH // 2 - prompt.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
-            self.screen.blit(name_text, (SCREEN_WIDTH // 2 - name_text.get_width() // 2, SCREEN_HEIGHT // 2))
+            # Calcola le posizioni per centrare le righe del prompt
+            # Sposta la prima riga un po' più in alto
+            self.screen.blit(prompt_line1, (SCREEN_WIDTH // 2 - prompt_line1.get_width() // 2, SCREEN_HEIGHT // 2 - 60)) # Spostato più in alto
+            # Sposta la seconda riga in modo che sia sotto la prima
+            self.screen.blit(prompt_line2, (SCREEN_WIDTH // 2 - prompt_line2.get_width() // 2, SCREEN_HEIGHT // 2 - 20)) # Sotto la prima riga
+            
+            # La riga del nome del giocatore rimane invariata o leggermente più in basso
+            self.screen.blit(name_text, (SCREEN_WIDTH // 2 - name_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20)) # Spostato leggermente più in basso
 
             pygame.display.flip()
 
@@ -356,12 +378,23 @@ class Tetris:
                                     elif confirm_event.key == pygame.K_ESCAPE:
                                         confirming = False # annulla l'operazione
 
-    def new_piece(self): 
-        self.piece_index = random.randint(0, len(SHAPES) - 1)
-        self.piece = [row[:] for row in SHAPES[self.piece_index]]
-        self.color = COLORS[self.piece_index]
+    def generate_next_piece(self):
+        # Scegli un indice casuale per il prossimo pezzo
+        self.next_piece_index = random.randint(0, len(SHAPES) - 1)
+        self.next_piece = [row[:] for row in SHAPES[self.next_piece_index]]
+        self.next_color = COLORS[self.next_piece_index]
+
+    def new_piece(self):
+        # Il pezzo attuale diventa quello che prima era il "prossimo pezzo"
+        self.piece_index = self.next_piece_index
+        self.piece = [row[:] for row in self.next_piece]
+        self.color = self.next_color
+
         self.piece_x = GRID_WIDTH // 2 - len(self.piece[0]) // 2
         self.piece_y = 0
+
+        # Genera subito il prossimo pezzo per l'anteprima
+        self.generate_next_piece()
 
         if self.check_collision(self.piece, self.piece_x, self.piece_y):
             self.game_over = True
@@ -455,6 +488,40 @@ class Tetris:
     def draw_score(self):
         text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
         self.screen.blit(text, (10, 10))
+    
+    def draw_next_piece(self):
+        PREVIEW_CELL_SIZE = CELL_SIZE // 2
+
+        # Sposta l'offset più a sinistra (ad esempio, da 0.85 a 0.80)
+        # Puoi provare diversi valori finché non trovi quello che ti soddisfa
+        preview_x_offset = int(SCREEN_WIDTH * 0.78) # <--- MODIFICA QUI
+
+        preview_y_offset = 10
+
+        box_width = 4 * PREVIEW_CELL_SIZE
+        box_height = 4 * PREVIEW_CELL_SIZE
+
+        pygame.draw.rect(self.screen, (50, 50, 50), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 0)
+        pygame.draw.rect(self.screen, (200, 200, 200), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 2)
+
+        next_text = self.font.render("NEXT", True, (255, 255, 255))
+        self.screen.blit(next_text, (preview_x_offset + box_width // 2 - next_text.get_width() // 2, preview_y_offset + box_height + 10))
+
+        if self.next_piece:
+            piece_w = len(self.next_piece[0])
+            piece_h = len(self.next_piece)
+
+            center_x_in_box = (box_width - piece_w * PREVIEW_CELL_SIZE) // 2
+            center_y_in_box = (box_height - piece_h * PREVIEW_CELL_SIZE) // 2
+
+            for y, row in enumerate(self.next_piece):
+                for x, cell in enumerate(row):
+                    if cell:
+                        rect_x = preview_x_offset + center_x_in_box + x * PREVIEW_CELL_SIZE
+                        rect_y = preview_y_offset + center_y_in_box + y * PREVIEW_CELL_SIZE
+                        rect = pygame.Rect(rect_x, rect_y, PREVIEW_CELL_SIZE, PREVIEW_CELL_SIZE)
+                        pygame.draw.rect(self.screen, self.next_color, rect)
+                        pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
 
     def save_score(self, name, score):
         try:
@@ -483,6 +550,7 @@ class Tetris:
             self.draw_grid()
             self.draw_piece()
             self.draw_score()
+            self.draw_next_piece() # Disegna l'anteprima del prossimo pezzo
 
             if self.game_over:
                 # Chiedi il nome e salva il punteggio una sola volta
