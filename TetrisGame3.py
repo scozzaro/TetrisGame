@@ -23,7 +23,7 @@ def resource_path(relative_path):
 # --- Costanti ---
 GRID_WIDTH = 10
 GRID_HEIGHT = 20
-CELL_SIZE = 30 
+CELL_SIZE = 30
 
 SCREEN_WIDTH = GRID_WIDTH * CELL_SIZE
 SCREEN_HEIGHT = GRID_HEIGHT * CELL_SIZE
@@ -32,8 +32,8 @@ HIGHSCORE_FILE = "highscores2.json" # Il file JSON verrà creato nella stessa di
 MAX_SCORES = 10
 
 SHAPES = [
-    [[1, 1, 1, 1]],         # Pezzo I
-    [[1, 1], [1, 1]],       # Pezzo O
+    [[1, 1, 1, 1]],        # Pezzo I
+    [[1, 1], [1, 1]],      # Pezzo O
     [[0, 1, 0], [1, 1, 1]], # Pezzo T
     [[1, 1, 0], [0, 1, 1]], # Pezzo S
     [[0, 1, 1], [1, 1, 0]], # Pezzo Z
@@ -65,7 +65,7 @@ class Tetris:
         self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
         pygame.mixer.init()
-        self.line_sound = pygame.mixer.Sound(resource_path(os.path.join("sound", "boss_cry.ogg")))
+        self.line_sound = pygame.mixer.Sound(resource_path(os.path.join("sound", "vie.ogg")))
 
         self.grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
         self.score = 0
@@ -96,6 +96,9 @@ class Tetris:
         self.fall_speed = max(150, 500 - self.difficolta * 35)
         print(f"Velocità di caduta: {self.fall_speed} ms")
 
+        # --- NUOVA VARIABILE PER LA VISIBILITÀ DELL'ANTEPRIMA ---
+        self.show_next_piece_preview = False
+
     def ask_player_name(self):
         name = ""
         input_active = True
@@ -103,12 +106,12 @@ class Tetris:
 
         while input_active:
             self.screen.fill((0, 0, 0))
-            
+
             # Prima riga del messaggio
             prompt_line1 = font.render("Game Over!", True, (255, 255, 255))
             # Seconda riga del messaggio
             prompt_line2 = font.render("Inserisci il tuo nome:", True, (255, 255, 255))
-            
+
             name_text = font.render(name + "|", True, (255, 255, 0))
 
             # Calcola le posizioni per centrare le righe del prompt
@@ -116,7 +119,7 @@ class Tetris:
             self.screen.blit(prompt_line1, (SCREEN_WIDTH // 2 - prompt_line1.get_width() // 2, SCREEN_HEIGHT // 2 - 60)) # Spostato più in alto
             # Sposta la seconda riga in modo che sia sotto la prima
             self.screen.blit(prompt_line2, (SCREEN_WIDTH // 2 - prompt_line2.get_width() // 2, SCREEN_HEIGHT // 2 - 20)) # Sotto la prima riga
-            
+
             # La riga del nome del giocatore rimane invariata o leggermente più in basso
             self.screen.blit(name_text, (SCREEN_WIDTH // 2 - name_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20)) # Spostato leggermente più in basso
 
@@ -147,10 +150,8 @@ class Tetris:
 
     def load_highscores(self):
         try:
-            # Per il file highscores, usa os.path.join(base_path, HIGHSCORE_FILE)
-            # dove base_path è la directory dell'eseguibile o dello script.
-            # Questo assicura che il file sia letto/scritto nella stessa posizione dell'eseguibile.
-            highscore_file_path = resource_path(os.path.join("image",HIGHSCORE_FILE))  # resource_path(HIGHSCORE_FILE)
+            # CORREZIONE QUI: Rimosso os.path.join("image", ...)
+            highscore_file_path = resource_path(HIGHSCORE_FILE)
             print(highscore_file_path)
             with open(highscore_file_path, "r") as f:
                 scores = json.load(f)
@@ -365,8 +366,8 @@ class Tetris:
                                     sys.exit()
                                 elif confirm_event.type == pygame.KEYDOWN:
                                     if confirm_event.key == pygame.K_s:
-                                        # Usa resource_path per eliminare il file highscores
-                                        highscore_file_path = resource_path(os.path.join("image",HIGHSCORE_FILE))
+                                        # CORREZIONE QUI: Rimosso os.path.join("image", ...)
+                                        highscore_file_path = resource_path(HIGHSCORE_FILE)
                                         print(highscore_file_path)
                                         if os.path.exists(highscore_file_path):
                                             os.remove(highscore_file_path)
@@ -488,13 +489,11 @@ class Tetris:
     def draw_score(self):
         text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
         self.screen.blit(text, (10, 10))
-    
+
     def draw_next_piece(self):
         PREVIEW_CELL_SIZE = CELL_SIZE // 2
 
-        # Sposta l'offset più a sinistra (ad esempio, da 0.85 a 0.80)
-        # Puoi provare diversi valori finché non trovi quello che ti soddisfa
-        preview_x_offset = int(SCREEN_WIDTH * 0.78) # <--- MODIFICA QUI
+        preview_x_offset = int(SCREEN_WIDTH * 0.78)
 
         preview_y_offset = 10
 
@@ -525,8 +524,8 @@ class Tetris:
 
     def save_score(self, name, score):
         try:
-            # Usa resource_path per salvare il file highscores nella directory dell'eseguibile
-            highscore_file_path = resource_path(os.path.join("image",HIGHSCORE_FILE))
+            # CORREZIONE QUI: Rimosso os.path.join("image", ...)
+            highscore_file_path = resource_path(HIGHSCORE_FILE)
             print(highscore_file_path)
             if os.path.exists(highscore_file_path):
                 with open(highscore_file_path, "r") as file:
@@ -550,7 +549,10 @@ class Tetris:
             self.draw_grid()
             self.draw_piece()
             self.draw_score()
-            self.draw_next_piece() # Disegna l'anteprima del prossimo pezzo
+
+            # --- CONDIZIONE PER DISEGNARE L'ANTEPRIMA ---
+            if self.show_next_piece_preview:
+                self.draw_next_piece()
 
             if self.game_over:
                 # Chiedi il nome e salva il punteggio una sola volta
@@ -596,6 +598,9 @@ class Tetris:
                             self.rotate_piece()
                         elif event.key == pygame.K_SPACE:
                             self.drop_piece()
+                        # --- GESTIONE DEL TASTO 'H' ---
+                        elif event.key == pygame.K_h:
+                            self.show_next_piece_preview = not self.show_next_piece_preview # Inverte lo stato
 
             if not self.game_over and self.fall_time > self.fall_speed:
                 if not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
