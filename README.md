@@ -117,6 +117,10 @@ La "parte vera" del gioco di Tetris è gestita principalmente da un insieme di f
 
 
 
+**SPIEGAZIONI DELLE FUNZIONI**
+
+
+
 
 **Scopo della Funzione check_collision**
 
@@ -242,3 +246,72 @@ RISULTATO: return True (Collisione rilevata!)
 La funzione si fermerebbe qui e tornerebbe True, indicando che il pezzo non può essere posizionato in (1,0) perché collide con il blocco esistente in (2,1) della griglia.
 
 Questo meccanismo permette al gioco di sapere se un'azione (movimento, rotazione o caduta) è valida prima di eseguirla, garantendo che i pezzi non si sovrappongano o escano dai limiti del campo di gioco.
+
+
+
+**Scopo della Funzione merge_piece**
+
+Lo scopo principale della funzione merge_piece è fissare il pezzo attualmente in caduta (il tetromino) nella griglia di gioco principale (self.grid) una volta che ha smesso di muoversi.
+
+In altre parole, quando un pezzo raggiunge il fondo della griglia o tocca un blocco già presente e non può più scendere, i suoi blocchi individuali vengono "bloccati" e diventano parte integrante della griglia permanente. Questo li rende solidi e impedisce ad altri pezzi di attraversarli, proprio come succede in un vero gioco di Tetris.
+
+Come Funziona Passo Dopo Passo
+Vediamo il codice e spieghiamo ogni parte:
+
+Python
+
+def merge_piece(self):
+    # Itera su ogni riga del pezzo attualmente in movimento
+    for y, row in enumerate(self.piece):
+        # Itera su ogni cella all'interno della riga corrente del pezzo
+        for x, cell in enumerate(row):
+            # Controlla se la cella del pezzo contiene un blocco attivo (cioè, non è uno spazio vuoto)
+            if cell:
+                # Calcola la posizione 'y' (riga) nella griglia principale
+                # Aggiungi la coordinata 'y' relativa del blocco all'offset verticale del pezzo
+                grid_y = self.piece_y + y
+                
+                # Calcola la posizione 'x' (colonna) nella griglia principale
+                # Aggiungi la coordinata 'x' relativa del blocco all'offset orizzontale del pezzo
+                grid_x = self.piece_x + x
+                
+                # Fissa il blocco del pezzo nella griglia principale
+                # Assegna il colore del pezzo corrente alla cella corrispondente nella griglia
+                self.grid[grid_y][grid_x] = self.color
+Spiegazione Dettagliata:
+
+for y, row in enumerate(self.piece):
+
+Questo ciclo esterno scorre attraverso le righe del pezzo self.piece. self.piece è la matrice 2D che rappresenta la forma del tetromino che stai controllando.
+y è l'indice della riga all'interno della matrice del pezzo (es. 0, 1, 2...).
+row è la lista che rappresenta la riga corrente del pezzo.
+for x, cell in enumerate(row):
+
+Questo ciclo interno scorre attraverso le celle di ogni row del pezzo.
+x è l'indice della colonna all'interno della riga del pezzo (es. 0, 1, 2...).
+cell è il valore della cella del pezzo (generalmente 1 se c'è un blocco, 0 se è vuoto).
+if cell:
+
+Questa è una condizione fondamentale. Il tuo self.piece non è solo una forma solida, ma una matrice che può contenere anche zeri (spazi vuoti). Ad esempio, il pezzo 'T' [[0, 1, 0], [1, 1, 1]] ha degli zeri.
+Questo if assicura che venga processato solo un blocco reale del pezzo (dove cell è 1), ignorando gli spazi vuoti che fanno parte della sua forma ma non sono blocchi fisici.
+grid_y = self.piece_y + y e grid_x = self.piece_x + x
+
+Qui avviene il calcolo delle coordinate assolute sulla griglia principale (self.grid).
+self.piece_y e self.piece_x sono le coordinate della posizione in alto a sinistra del pezzo sulla griglia di gioco.
+y e x sono le coordinate relative di un singolo blocco all'interno della forma del pezzo.
+Sommando queste coordinate, otteniamo la posizione esatta (grid_y, grid_x) in cui il blocco del pezzo deve essere "incollato" sulla griglia.
+self.grid[grid_y][grid_x] = self.color
+
+Questa è l'azione chiave. Utilizzando le coordinate grid_y e grid_x appena calcolate, accedi alla cella corrispondente nella matrice self.grid.
+Invece di assegnare un 1 (che indicherebbe solo che c'è un blocco), assegni il self.color del pezzo. Questo è un modo comune in Tetris per memorizzare non solo la presenza di un blocco, ma anche il suo colore, il che è essenziale per il rendering grafico del gioco.
+Una volta che il colore viene assegnato, quel blocco è permanentemente parte della griglia di gioco.
+Quando Viene Chiamata merge_piece?
+La funzione merge_piece viene tipicamente chiamata dopo che check_collision ha determinato che il pezzo non può più muoversi verso il basso. Questo accade in due scenari principali:
+
+Caduta Naturale: Quando il pezzo, muovendosi verso il basso per il tempo di caduta (gestito da self.fall_time), trova una collisione sotto di sé.
+Hard Drop: Quando il giocatore preme il tasto per far cadere il pezzo istantaneamente (pygame.K_SPACE), dopo che il pezzo è stato spostato il più in basso possibile fino a collisione.
+Dopo che merge_piece è stata eseguita, il pezzo attuale è stato "bloccato" nella griglia, e il gioco procede a:
+
+Controllare e cancellare le linee completate (self.clear_lines()).
+Generare un nuovo pezzo (self.new_piece()).
+In sintesi, merge_piece è il meccanismo che trasforma un pezzo mobile in una parte statica del campo di gioco, consentendo la costruzione di righe e la successiva pulizia.
