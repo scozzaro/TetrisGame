@@ -73,6 +73,7 @@ class Tetris:
         self.score = 0
         self.game_over = False
         self.score_saved = False
+        self.paused = False # Aggiungi questa linea
 
         # --- NUOVO: Crea una superficie separata per la griglia di gioco ---
         # Questa superficie conterrà solo la griglia di Tetris stessa
@@ -100,6 +101,272 @@ class Tetris:
 
         # --- NUOVA VARIABILE PER LA VISIBILITÀ DELL'ANTEPRIMA ---
         self.show_next_piece_preview = False
+
+    
+
+    def riempi_blocchi_difficolta(self):
+        if self.difficolta <= 0:
+            return
+
+        numero_blocchi = int((GRID_WIDTH * GRID_HEIGHT) * (self.difficolta / 80))
+
+        for _ in range(numero_blocchi):
+            x = random.randint(0, GRID_WIDTH - 1)
+            y = random.randint(GRID_HEIGHT // 2, GRID_HEIGHT - 1)
+            if self.grid[y][x] == 0:
+                colore_random = random.choice(COLORS)
+                self.grid[y][x] = colore_random
+  
+
+    def generate_next_piece(self):
+        # Scegli un indice casuale per il prossimo pezzo
+        self.next_piece_index = random.randint(0, len(SHAPES) - 1)
+        self.next_piece = [row[:] for row in SHAPES[self.next_piece_index]]
+        self.next_color = COLORS[self.next_piece_index]
+
+    def new_piece(self):
+        # Il pezzo attuale diventa quello che prima era il "prossimo pezzo"
+        self.piece_index = self.next_piece_index
+        self.piece = [row[:] for row in self.next_piece]
+        self.color = self.next_color
+
+        self.piece_x = GRID_WIDTH // 2 - len(self.piece[0]) // 2
+        self.piece_y = 0
+
+        # Genera subito il prossimo pezzo per l'anteprima
+        self.generate_next_piece()
+
+        if self.check_collision(self.piece, self.piece_x, self.piece_y):
+            self.game_over = True
+
+    def check_collision(self, piece, offset_x, offset_y):
+        for y, row in enumerate(piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    px = offset_x + x
+                    py = offset_y + y
+                    if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:
+                        return True
+                    if py >= 0 and self.grid[py][px]:
+                        return True
+        return False
+
+    def merge_piece(self):
+        for y, row in enumerate(self.piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    self.grid[self.piece_y + y][self.piece_x + x] = self.color
+
+    def clear_lines(self):
+        new_grid = []
+        lines_cleared = 0
+        for row in self.grid:
+            if 0 not in row:
+                lines_cleared += 1
+            else:
+                new_grid.append(row)
+        for _ in range(lines_cleared):
+            new_grid.insert(0, [0] * GRID_WIDTH)
+        if lines_cleared > 0:
+            self.line_sound.play()
+        self.grid = new_grid
+        self.score += lines_cleared ** 3    
+
+    def rotate_piece(self):
+        rotated = [list(row) for row in zip(*self.piece[::-1])]
+        if not self.check_collision(rotated, self.piece_x, self.piece_y):
+            self.piece = rotated
+
+    def move_piece(self, dx, dy):
+        if not self.check_collision(self.piece, self.piece_x + dx, self.piece_y + dy):
+            self.piece_x += dx
+            self.piece_y += dy
+
+    def drop_piece(self):
+        while not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
+            self.piece_y += 1
+        self.merge_piece()
+        self.clear_lines()
+        self.new_piece()
+
+    def draw_grid(self):
+        for y in range(GRID_HEIGHT):
+            for x in range(GRID_WIDTH):
+                cell = self.grid[y][x]
+                if cell != 0:
+                    rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                    pygame.draw.rect(self.screen, cell, rect)
+                    pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+
+    def draw_piece(self):
+        for y, row in enumerate(self.piece):
+            for x, cell in enumerate(row):
+                if cell:
+                    rect = pygame.Rect((self.piece_x + x) * CELL_SIZE, (self.piece_y + y) * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                    pygame.draw.rect(self.screen, self.color, rect)
+                    pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
+
+    def draw_game_over(self):
+        game_over_text = "GAME OVER"
+        press_r_text = "Press R"
+
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    border1 = self.font.render(game_over_text, True, (0, 0, 0))
+                    border2 = self.font.render(press_r_text, True, (0, 0, 0))
+                    self.screen.blit(border1, (SCREEN_WIDTH // 2 - border1.get_width() // 2 + dx,
+                                                SCREEN_HEIGHT // 2 - 30 + dy))
+                    self.screen.blit(border2, (SCREEN_WIDTH // 2 - border2.get_width() // 2 + dx,
+                                                SCREEN_HEIGHT // 2 + 10 + dy))
+
+        text1 = self.font.render(game_over_text, True, (255, 255, 0))
+        text2 = self.font.render(press_r_text, True, (0, 255, 0))
+        self.screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 30))
+        self.screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 10))
+
+    def draw_score(self):
+        text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.screen.blit(text, (10, 10))
+
+    def draw_next_piece(self):
+        PREVIEW_CELL_SIZE = CELL_SIZE // 2
+
+        preview_x_offset = int(SCREEN_WIDTH * 0.78)
+
+        preview_y_offset = 10
+
+        box_width = 4 * PREVIEW_CELL_SIZE
+        box_height = 4 * PREVIEW_CELL_SIZE
+
+        pygame.draw.rect(self.screen, (50, 50, 50), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 0)
+        pygame.draw.rect(self.screen, (200, 200, 200), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 2)
+
+        next_text = self.font.render("NEXT", True, (255, 255, 255))
+        self.screen.blit(next_text, (preview_x_offset + box_width // 2 - next_text.get_width() // 2, preview_y_offset + box_height + 10))
+
+        if self.next_piece:
+            piece_w = len(self.next_piece[0])
+            piece_h = len(self.next_piece)
+
+            center_x_in_box = (box_width - piece_w * PREVIEW_CELL_SIZE) // 2
+            center_y_in_box = (box_height - piece_h * PREVIEW_CELL_SIZE) // 2
+
+            for y, row in enumerate(self.next_piece):
+                for x, cell in enumerate(row):
+                    if cell:
+                        rect_x = preview_x_offset + center_x_in_box + x * PREVIEW_CELL_SIZE
+                        rect_y = preview_y_offset + center_y_in_box + y * PREVIEW_CELL_SIZE
+                        rect = pygame.Rect(rect_x, rect_y, PREVIEW_CELL_SIZE, PREVIEW_CELL_SIZE)
+                        pygame.draw.rect(self.screen, self.next_color, rect)
+                        pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
+
+    def draw_pause_text(self):
+        pause_text = "PAUSA"
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    border_text = self.font.render(pause_text, True, (0, 0, 0))
+                    self.screen.blit(border_text, (SCREEN_WIDTH // 2 - border_text.get_width() // 2 + dx,
+                                                    SCREEN_HEIGHT // 2 - border_text.get_height() // 2 + dy))
+
+        text = self.font.render(pause_text, True, (255, 255, 255))
+        self.screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2,
+                                 SCREEN_HEIGHT // 2 - text.get_height() // 2))
+
+    def run(self):
+        self.show_menu()
+
+        while True:
+            # --- Gestione di TUTTI gli eventi in un unico ciclo ---
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                # Gestione del tasto 'P' per la pausa (funziona sempre, anche in game over ma in quel caso non c'è logica di movimento)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:
+                        self.paused = not self.paused # Inverte lo stato di pausa
+                        if self.paused:
+                            print("Gioco in pausa")
+                        else:
+                            print("Gioco ripreso")
+                    
+                    # Gestione dei controlli di gioco (movimento, rotazione, drop)
+                    # Questi funzionano SOLO se il gioco NON è in game_over e NON è in pausa
+                    if not self.game_over and not self.paused:
+                        if event.key == pygame.K_LEFT:
+                            self.move_piece(-1, 0)
+                        elif event.key == pygame.K_RIGHT:
+                            self.move_piece(1, 0)
+                        elif event.key == pygame.K_DOWN:
+                            self.move_piece(0, 1)
+                        elif event.key == pygame.K_UP:
+                            self.rotate_piece()
+                        elif event.key == pygame.K_SPACE:
+                            self.drop_piece()
+                        elif event.key == pygame.K_h:
+                            self.show_next_piece_preview = not self.show_next_piece_preview
+
+                    # Gestione del riavvio dopo il Game Over (funziona SOLO se il gioco è in game_over)
+                    if self.game_over and event.key == pygame.K_r:
+                        self.__init__() # Reinizializza il gioco
+                        self.run() # Riavvia il ciclo principale del gioco
+                        return # Esce dalla funzione run corrente per evitare cicli sovrapposti
+
+            # --- Disegno dello sfondo e della griglia (sempre visibili) ---
+            self.screen.blit(self.background_image, (0, 0))
+            self.draw_grid()
+            self.draw_piece()
+            self.draw_score()
+
+            # --- CONDIZIONE PER DISEGNARE L'ANTEPRIMA ---
+            if self.show_next_piece_preview:
+                self.draw_next_piece()
+
+            # --- Logica di gioco principale (se NON game over e NON in pausa) ---
+            if not self.game_over and not self.paused:
+                self.fall_time += self.clock.get_time()
+
+                if self.fall_time > self.fall_speed:
+                    if not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
+                        self.piece_y += 1
+                    else:
+                        self.merge_piece()
+                        self.clear_lines()
+                        self.new_piece()
+                    self.fall_time = 0
+            elif self.paused: # Se il gioco è in pausa, disegna il testo "PAUSA"
+                self.draw_pause_text()
+            elif self.game_over: # Se il gioco è finito, disegna il testo "GAME OVER"
+                # Chiedi il nome e salva il punteggio una sola volta
+                if not self.score_saved:
+                    name = self.ask_player_name()
+                    self.save_score(name, self.score)
+                    self.score_saved = True # Segna che il punteggio è stato salvato
+                self.draw_game_over()
+            
+            pygame.display.flip()
+            self.clock.tick(60)
+
+    def save_score(self, name, score):
+        try:
+            highscore_file_path = resource_path(HIGHSCORE_FILE)
+            print(highscore_file_path)
+            if os.path.exists(highscore_file_path):
+                with open(highscore_file_path, "r") as file:
+                    highscores = json.load(file)
+            else:
+                highscores = []
+        except (FileNotFoundError, json.JSONDecodeError): # Specificare le eccezioni
+            highscores = []
+
+        highscores.append({"name": name, "score": score})
+        highscores = sorted(highscores, key=lambda x: x["score"], reverse=True)[:MAX_SCORES]
+
+        with open(highscore_file_path, "w") as file:
+            json.dump(highscores, file, indent=4)
 
     def ask_player_name(self):
         name = ""
@@ -165,20 +432,7 @@ class Tetris:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Errore caricamento highscores: {e}. Il file potrebbe non esistere o essere corrotto.")
             return []
-
-    def riempi_blocchi_difficolta(self):
-        if self.difficolta <= 0:
-            return
-
-        numero_blocchi = int((GRID_WIDTH * GRID_HEIGHT) * (self.difficolta / 80))
-
-        for _ in range(numero_blocchi):
-            x = random.randint(0, GRID_WIDTH - 1)
-            y = random.randint(GRID_HEIGHT // 2, GRID_HEIGHT - 1)
-            if self.grid[y][x] == 0:
-                colore_random = random.choice(COLORS)
-                self.grid[y][x] = colore_random
-
+    
     def show_about(self):
         self.screen.fill((0, 0, 0)) # Sfondo nero
         clock = pygame.time.Clock()
@@ -530,241 +784,6 @@ class Tetris:
                                         waiting = False # esci dalla schermata dei record
                                     elif confirm_event.key == pygame.K_ESCAPE:
                                         confirming = False # annulla l'operazione
-
-    def generate_next_piece(self):
-        # Scegli un indice casuale per il prossimo pezzo
-        self.next_piece_index = random.randint(0, len(SHAPES) - 1)
-        self.next_piece = [row[:] for row in SHAPES[self.next_piece_index]]
-        self.next_color = COLORS[self.next_piece_index]
-
-    def new_piece(self):
-        # Il pezzo attuale diventa quello che prima era il "prossimo pezzo"
-        self.piece_index = self.next_piece_index
-        self.piece = [row[:] for row in self.next_piece]
-        self.color = self.next_color
-
-        self.piece_x = GRID_WIDTH // 2 - len(self.piece[0]) // 2
-        self.piece_y = 0
-
-        # Genera subito il prossimo pezzo per l'anteprima
-        self.generate_next_piece()
-
-        if self.check_collision(self.piece, self.piece_x, self.piece_y):
-            self.game_over = True
-
-    def check_collision(self, piece, offset_x, offset_y):
-        for y, row in enumerate(piece):
-            for x, cell in enumerate(row):
-                if cell:
-                    px = offset_x + x
-                    py = offset_y + y
-                    if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:
-                        return True
-                    if py >= 0 and self.grid[py][px]:
-                        return True
-        return False
-
-    def merge_piece(self):
-        for y, row in enumerate(self.piece):
-            for x, cell in enumerate(row):
-                if cell:
-                    self.grid[self.piece_y + y][self.piece_x + x] = self.color
-
-    def clear_lines(self):
-        new_grid = []
-        lines_cleared = 0
-        for row in self.grid:
-            if 0 not in row:
-                lines_cleared += 1
-            else:
-                new_grid.append(row)
-        for _ in range(lines_cleared):
-            new_grid.insert(0, [0] * GRID_WIDTH)
-        if lines_cleared > 0:
-            self.line_sound.play()
-        self.grid = new_grid
-        self.score += lines_cleared ** 2
-
-    def rotate_piece(self):
-        rotated = [list(row) for row in zip(*self.piece[::-1])]
-        if not self.check_collision(rotated, self.piece_x, self.piece_y):
-            self.piece = rotated
-
-    def move_piece(self, dx, dy):
-        if not self.check_collision(self.piece, self.piece_x + dx, self.piece_y + dy):
-            self.piece_x += dx
-            self.piece_y += dy
-
-    def drop_piece(self):
-        while not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
-            self.piece_y += 1
-        self.merge_piece()
-        self.clear_lines()
-        self.new_piece()
-
-    def draw_grid(self):
-        for y in range(GRID_HEIGHT):
-            for x in range(GRID_WIDTH):
-                cell = self.grid[y][x]
-                if cell != 0:
-                    rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                    pygame.draw.rect(self.screen, cell, rect)
-                    pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
-
-    def draw_piece(self):
-        for y, row in enumerate(self.piece):
-            for x, cell in enumerate(row):
-                if cell:
-                    rect = pygame.Rect((self.piece_x + x) * CELL_SIZE, (self.piece_y + y) * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                    pygame.draw.rect(self.screen, self.color, rect)
-                    pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
-
-    def draw_game_over(self):
-        game_over_text = "GAME OVER"
-        press_r_text = "Press R"
-
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx != 0 or dy != 0:
-                    border1 = self.font.render(game_over_text, True, (0, 0, 0))
-                    border2 = self.font.render(press_r_text, True, (0, 0, 0))
-                    self.screen.blit(border1, (SCREEN_WIDTH // 2 - border1.get_width() // 2 + dx,
-                                                SCREEN_HEIGHT // 2 - 30 + dy))
-                    self.screen.blit(border2, (SCREEN_WIDTH // 2 - border2.get_width() // 2 + dx,
-                                                SCREEN_HEIGHT // 2 + 10 + dy))
-
-        text1 = self.font.render(game_over_text, True, (255, 255, 0))
-        text2 = self.font.render(press_r_text, True, (0, 255, 0))
-        self.screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 30))
-        self.screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 + 10))
-
-    def draw_score(self):
-        text = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
-        self.screen.blit(text, (10, 10))
-
-    def draw_next_piece(self):
-        PREVIEW_CELL_SIZE = CELL_SIZE // 2
-
-        preview_x_offset = int(SCREEN_WIDTH * 0.78)
-
-        preview_y_offset = 10
-
-        box_width = 4 * PREVIEW_CELL_SIZE
-        box_height = 4 * PREVIEW_CELL_SIZE
-
-        pygame.draw.rect(self.screen, (50, 50, 50), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 0)
-        pygame.draw.rect(self.screen, (200, 200, 200), (preview_x_offset - 5, preview_y_offset - 5, box_width + 10, box_height + 10), 2)
-
-        next_text = self.font.render("NEXT", True, (255, 255, 255))
-        self.screen.blit(next_text, (preview_x_offset + box_width // 2 - next_text.get_width() // 2, preview_y_offset + box_height + 10))
-
-        if self.next_piece:
-            piece_w = len(self.next_piece[0])
-            piece_h = len(self.next_piece)
-
-            center_x_in_box = (box_width - piece_w * PREVIEW_CELL_SIZE) // 2
-            center_y_in_box = (box_height - piece_h * PREVIEW_CELL_SIZE) // 2
-
-            for y, row in enumerate(self.next_piece):
-                for x, cell in enumerate(row):
-                    if cell:
-                        rect_x = preview_x_offset + center_x_in_box + x * PREVIEW_CELL_SIZE
-                        rect_y = preview_y_offset + center_y_in_box + y * PREVIEW_CELL_SIZE
-                        rect = pygame.Rect(rect_x, rect_y, PREVIEW_CELL_SIZE, PREVIEW_CELL_SIZE)
-                        pygame.draw.rect(self.screen, self.next_color, rect)
-                        pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)
-
-    def save_score(self, name, score):
-        try:
-            highscore_file_path = resource_path(HIGHSCORE_FILE)
-            print(highscore_file_path)
-            if os.path.exists(highscore_file_path):
-                with open(highscore_file_path, "r") as file:
-                    highscores = json.load(file)
-            else:
-                highscores = []
-        except (FileNotFoundError, json.JSONDecodeError): # Specificare le eccezioni
-            highscores = []
-
-        highscores.append({"name": name, "score": score})
-        highscores = sorted(highscores, key=lambda x: x["score"], reverse=True)[:MAX_SCORES]
-
-        with open(highscore_file_path, "w") as file:
-            json.dump(highscores, file, indent=4)
-
-    def run(self):
-        self.show_menu()
-
-        while True:
-            self.screen.blit(self.background_image, (0, 0))
-            self.draw_grid()
-            self.draw_piece()
-            self.draw_score()
-
-            # --- CONDIZIONE PER DISEGNARE L'ANTEPRIMA ---
-            if self.show_next_piece_preview:
-                self.draw_next_piece()
-
-            if self.game_over:
-                # Chiedi il nome e salva il punteggio una sola volta
-                if not self.score_saved:
-                    name = self.ask_player_name()
-                    self.save_score(name, self.score)
-                    self.score_saved = True # Segna che il punteggio è stato salvato
-
-                self.draw_game_over()
-                pygame.display.flip() # Aggiorna lo schermo per mostrare il testo di game over
-
-                # Gestione dell'input per riavviare il gioco solo dopo aver mostrato game over
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                        sys.exit()
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_r:
-                            self.__init__() # Reinizializza il gioco
-                            self.run() # Riavvia il ciclo principale del gioco
-                            return # Esce dalla funzione run corrente per evitare cicli sovrapposti
-                self.clock.tick(60) # Continua a tickare anche in game over per gestire input
-                continue # Continua il ciclo while True per mostrare Game Over finché non si preme 'R'
-
-
-            # Logica di gioco normale (solo se game_over è False)
-            self.fall_time += self.clock.get_time()
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-                if event.type == pygame.KEYDOWN:
-                    if not self.game_over: # Assicurati che i controlli funzionino solo in gioco
-                        if event.key == pygame.K_LEFT:
-                            self.move_piece(-1, 0)
-                        elif event.key == pygame.K_RIGHT:
-                            self.move_piece(1, 0)
-                        elif event.key == pygame.K_DOWN:
-                            self.move_piece(0, 1)
-                        elif event.key == pygame.K_UP:
-                            self.rotate_piece()
-                        elif event.key == pygame.K_SPACE:
-                            self.drop_piece()
-                        # --- GESTIONE DEL TASTO 'H' ---
-                        elif event.key == pygame.K_h:
-                            self.show_next_piece_preview = not self.show_next_piece_preview # Inverte lo stato
-
-            if not self.game_over and self.fall_time > self.fall_speed:
-                if not self.check_collision(self.piece, self.piece_x, self.piece_y + 1):
-                    self.piece_y += 1
-                else:
-                    self.merge_piece()
-                    self.clear_lines()
-                    self.new_piece()
-                self.fall_time = 0
-
-            pygame.display.flip()
-            self.clock.tick(60)
-
 
 if __name__ == "__main__":
     Tetris().run()
