@@ -113,3 +113,132 @@ La "parte vera" del gioco di Tetris è gestita principalmente da un insieme di f
   
   Calcola il numero di blocchi da aggiungere in base a self.difficolta (derivata dal punteggio più alto). Più alto è il punteggio, più blocchi vengono aggiunti.
   Aggiunge questi blocchi in posizioni casuali nella parte inferiore della griglia (dalla metà in giù) con colori casuali. Questo riduce lo spazio disponibile e aumenta la sfida.
+
+
+
+
+
+**Scopo della Funzione check_collision**
+
+La funzione check_collision(self, piece, offset_x, offset_y) ha un ruolo cruciale nel gioco Tetris: determina se un determinato pezzo, posizionato in una specifica coordinata (offset_x, offset_y), si sovrappone a blocchi già presenti nella griglia o supera i bordi della griglia stessa.
+
+Viene chiamata in diverse situazioni:
+
+Quando un pezzo cade: per verificare se il pezzo è arrivato in fondo o ha toccato un altro blocco.
+Quando un pezzo si muove lateralmente: per assicurarsi che non esca dai bordi o non si sovrapponga ad altri blocchi.
+Quando un pezzo ruota: per vedere se la rotazione è valida, cioè se il pezzo ruotato non finisce fuori dai bordi o dentro altri blocchi.
+Quando un nuovo pezzo appare: per controllare subito se il gioco è finito (se il nuovo pezzo collide all'istante).
+Come Funziona Passo Dopo Passo
+Analizziamo il codice riga per riga:
+
+Python
+
+def check_collision(self, piece, offset_x, offset_y):
+    # Itera attraverso le righe e le colonne del pezzo che stai esaminando
+    for y, row in enumerate(piece):
+        for x, cell in enumerate(row):
+            # Controlla solo i "blocchi attivi" del pezzo (dove cell è 1)
+            if cell:
+                # Calcola la posizione effettiva (assoluta) del blocco sulla griglia principale
+                px = offset_x + x
+                py = offset_y + y
+                
+                # --- Controllo Collisione con i Bordi ---
+                # Se il blocco esce dai lati (sinistro o destro) o dal fondo della griglia
+                if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:
+                    return True # C'è una collisione
+                
+                # --- Controllo Collisione con altri Blocchi già presenti ---
+                # Importante: py >= 0 serve a ignorare le celle che sono sopra la griglia (y negativa),
+                # perché il pezzo inizia a cadere da lì e non deve generare collisioni iniziali.
+                # Se la cella della griglia in quella posizione non è vuota (self.grid[py][px] è diverso da 0)
+                if py >= 0 and self.grid[py][px]:
+                    return True # C'è una collisione
+    
+    # Se il loop finisce senza trovare collisioni
+    return False # Non c'è collisione
+Spiegazione Dettagliata:
+
+for y, row in enumerate(piece): e for x, cell in enumerate(row):: Questi due cicli nidificati scorrono attraverso ogni cella del pezzo (piece). piece è una lista di liste che rappresenta la forma del pezzo attuale (es. [[0, 1, 0], [1, 1, 1]] per il pezzo T). y e x sono le coordinate relative all'interno della matrice piece. cell è il valore della cella (1 se c'è un blocco, 0 se è vuota).
+
+if cell:: Questa condizione assicura che il codice all'interno venga eseguito solo se la cella del pezzo che stiamo esaminando contiene effettivamente un blocco (valore 1), ignorando gli spazi vuoti nella forma del pezzo.
+
+px = offset_x + x e py = offset_y + y: Qui avviene la magia. offset_x e offset_y sono le coordinate della posizione in alto a sinistra del pezzo sulla griglia principale. Per ogni singolo blocco (cell) all'interno del pezzo, calcoliamo le sue coordinate (px, py) sulla griglia globale aggiungendo gli offset alle sue coordinate (x, y) relative.
+
+if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:: Questo è il controllo della collisione con i bordi.
+
+px < 0: Il blocco è uscito dal bordo sinistro.
+px >= GRID_WIDTH: Il blocco è uscito dal bordo destro.
+py >= GRID_HEIGHT: Il blocco è andato sotto il fondo della griglia. Se una di queste condizioni è vera, significa che il pezzo nella sua posizione proposta si scontra con un bordo, quindi la funzione ritorna immediatamente True.
+if py >= 0 and self.grid[py][px]:: Questo è il controllo della collisione con blocchi già presenti.
+
+py >= 0: Questa condizione è fondamentale. I pezzi iniziano la loro caduta con piece_y che può essere 0 o anche negativa (se il pezzo è più alto di 1 blocco e la sua parte superiore è fuori dallo schermo). Non vogliamo che il gioco termini immediatamente se la parte superiore di un pezzo è ancora "nel cielo" ma collide con un blocco in quella posizione fittizia. Quindi, controlliamo solo se py è all'interno della griglia visibile o sotto di essa.
+self.grid[py][px]: Se la cella corrispondente nella griglia principale (self.grid) in quella posizione (py, px) contiene già un blocco (cioè il suo valore non è 0), allora c'è una collisione con un blocco esistente. In questo caso, la funzione ritorna True.
+return False: Se tutti i blocchi del pezzo sono stati controllati e nessuna delle condizioni di collisione (px < 0, px >= GRID_WIDTH, py >= GRID_HEIGHT, self.grid[py][px]) è stata soddisfatta, significa che il pezzo può essere posizionato in quelle coordinate senza problemi. La funzione ritorna False, indicando "nessuna collisione".
+
+Esempio e Disegno
+Immaginiamo una griglia di Tetris semplificata e un pezzo che sta cadendo.
+
+Scenario:
+
+Griglia (self.grid): Supponiamo una piccola porzione di griglia. I numeri rappresentano i colori dei blocchi, 0 indica una cella vuota.
+
+(0,0) (1,0) (2,0) ...
+[0, 0, 0, ...]  (Riga 0)
+[0, 0, 0, ...]  (Riga 1)
+[0, 5, 0, ...]  (Riga 2)  <- C'è un blocco qui
+[0, 5, 5, ...]  (Riga 3)
+[0, 0, 0, ...]  (Riga 4)
+Pezzo (piece): Il pezzo 'I' (linea orizzontale) ruotato di 90 gradi.
+
+[0, 1, 0]
+[0, 1, 0]
+[0, 1, 0]
+[0, 1, 0]
+Tentativo di Spostamento:
+
+offset_x = 1 (Posizione iniziale del pezzo a 1 colonna da sinistra)
+offset_y = 1 (Posizione iniziale del pezzo a 1 riga dall'alto)
+Disegno (Immaginario):
+
+Griglia:
+(0,0)   (1,0)   (2,0)   (3,0)
+[     ][     ][     ][     ] R0
+[     ][     ][ Blocco ][     ] R1  <-- self.grid[1][2] = Colore (un blocco esiste qui)
+[     ][     ][     ][     ] R2
+[     ][     ][     ][     ] R3
+
+
+Pezzo (forma I verticale):
+  [ ]
+  [X]
+  [X]
+  [X]
+  [ ]
+
+Ora, applichiamo la funzione check_collision con piece (la 'I' verticale), offset_x = 1, offset_y = 0.
+
+Processo check_collision:
+
+Il pezzo I ha i blocchi a (1,0), (1,1), (1,2), (1,3) rispetto alla sua propria origine (0,0).
+
+Iterazione 1: Cella del pezzo (0, 1) - Blocco 'X' in alto
+
+x = 1, y = 0, cell = 1
+px = offset_x + x = 1 + 1 = 2
+py = offset_y + y = 0 + 0 = 0
+Controlli:
+Bordi: px=2 non è <0 o >=GRID_WIDTH. py=0 non è >=GRID_HEIGHT. OK.
+Griglia: py=0 è >=0. self.grid[0][2] è 0 (vuoto). OK.
+Iterazione 2: Cella del pezzo (1, 1) - Blocco 'X' successivo
+
+x = 1, y = 1, cell = 1
+px = offset_x + x = 1 + 1 = 2
+py = offset_y + y = 0 + 1 = 1
+Controlli:
+Bordi: OK.
+Griglia: py=1 è >=0. self.grid[1][2] NON è 0 (contiene un blocco!).
+RISULTATO: return True (Collisione rilevata!)
+La funzione si fermerebbe qui e tornerebbe True, indicando che il pezzo non può essere posizionato in (1,0) perché collide con il blocco esistente in (2,1) della griglia.
+
+Questo meccanismo permette al gioco di sapere se un'azione (movimento, rotazione o caduta) è valida prima di eseguirla, garantendo che i pezzi non si sovrappongano o escano dai limiti del campo di gioco.
