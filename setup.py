@@ -31,10 +31,10 @@ options = {
 # Definizione dell'eseguibile
 executables = [
     Executable(
-        "tetrisgame3.py",       # Il tuo script Python principale
+        "tetrisgame4.py",       # Il tuo script Python principale
         base=base,              # Il tipo di base (GUI o console)
         target_name="tetrisgame.exe" # Il nome che avrà il tuo file .exe
-        #, icon="icona.ico"        # OPZIONALE: Percorso di un file .ico per l'icona dell'eseguibile
+        , icon="tetris_15552.ico"        # OPZIONALE: Percorso di un file .ico per l'icona dell'eseguibile
                                 # Assicurati che 'icona.ico' esista nella stessa directory di setup.py
     )
 ]
@@ -42,7 +42,7 @@ executables = [
 # Configurazione finale del setup
 setup(
     name = "TetrisGame",
-    version = "1.0",
+    version = "4.0",
     description = "Il mio gioco Tetris in Python",
     options = options,
     executables = executables

@@ -5,6 +5,10 @@ import json
 import os
 import math
 
+
+# pip install cx_Freeze  
+# python setup.py build
+ 
 # --- Funzione per trovare le risorse ---
 # Questa funzione è essenziale per far funzionare il gioco dopo che è stato impacchettato.
 def resource_path(relative_path):
@@ -140,22 +144,48 @@ class Tetris:
             self.game_over = True
 
     def check_collision(self, piece, offset_x, offset_y):
+        # Itera attraverso le righe e le colonne del pezzo che stai esaminando
         for y, row in enumerate(piece):
             for x, cell in enumerate(row):
+                # Controlla solo i "blocchi attivi" del pezzo (dove cell è 1)
                 if cell:
+                    # Calcola la posizione effettiva (assoluta) del blocco sulla griglia principale
                     px = offset_x + x
                     py = offset_y + y
+                    
+                    # --- Controllo Collisione con i Bordi ---
+                    # Se il blocco esce dai lati (sinistro o destro) o dal fondo della griglia
                     if px < 0 or px >= GRID_WIDTH or py >= GRID_HEIGHT:
-                        return True
+                        return True # C'è una collisione
+                    
+                    # --- Controllo Collisione con altri Blocchi già presenti ---
+                    # Importante: py >= 0 serve a ignorare le celle che sono sopra la griglia (y negativa),
+                    # perché il pezzo inizia a cadere da lì e non deve generare collisioni iniziali.
+                    # Se la cella della griglia in quella posizione non è vuota (self.grid[py][px] è diverso da 0)
                     if py >= 0 and self.grid[py][px]:
-                        return True
-        return False
+                        return True # C'è una collisione
+        
+        # Se il loop finisce senza trovare collisioni
+        return False # Non c'è collisione
 
     def merge_piece(self):
+        # Itera su ogni riga del pezzo attualmente in movimento
         for y, row in enumerate(self.piece):
+            # Itera su ogni cella all'interno della riga corrente del pezzo
             for x, cell in enumerate(row):
+                # Controlla se la cella del pezzo contiene un blocco attivo (cioè, non è uno spazio vuoto)
                 if cell:
-                    self.grid[self.piece_y + y][self.piece_x + x] = self.color
+                    # Calcola la posizione 'y' (riga) nella griglia principale
+                    # Aggiungi la coordinata 'y' relativa del blocco all'offset verticale del pezzo
+                    grid_y = self.piece_y + y
+                    
+                    # Calcola la posizione 'x' (colonna) nella griglia principale
+                    # Aggiungi la coordinata 'x' relativa del blocco all'offset orizzontale del pezzo
+                    grid_x = self.piece_x + x
+                    
+                    # Fissa il blocco del pezzo nella griglia principale
+                    # Assegna il colore del pezzo corrente alla cella corrispondente nella griglia
+                    self.grid[grid_y][grid_x] = self.color
 
     def clear_lines(self):
         new_grid = []
@@ -519,14 +549,14 @@ class Tetris:
             if display_y + total_text_height < 0:
                 current_y_offset = 0
 
-    def show_help(self):
+    def show_help(self): 
         self.screen.fill((0, 0, 0))
         # Dimensione del font per il testo normale
         help_font = pygame.font.SysFont("Arial", 16)
         # Dimensione del font per i titoli di sezione
         title_font = pygame.font.SysFont("Arial", 22, bold=True)
 
-        y_offset = 20
+        y_offset = 10
         line_height = 20 # Spazio tra le righe ridotto
         section_spacing = 25 # Spazio tra le sezioni ridotto
 
@@ -566,7 +596,8 @@ class Tetris:
             "- FRECCIA Giù: Fai cadere il pezzo più veloce.",
             "- FRECCIA Su: Ruota il pezzo.",
             "- SPAZIO: Caduta istantanea (Hard Drop).", 
-            "- H: Attiva/disattiva anteprima prossimo pezzo."
+            "- H: Attiva/disattiva anteprima prossimo pezzo.", 
+            "- P: Mette il gioco in pausa o riparte."
         ]
         for control in controls:
             text_surface = help_font.render(control, True, (255, 255, 255))
