@@ -1,6 +1,10 @@
 import sys
 from cx_Freeze import setup, Executable
 
+# pip install cx_Freeze  
+# python setupTetris4.py build
+
+
 # Definisci le cartelle delle risorse che vuoi includere.
 # Ogni tupla è (percorso_sorgente, percorso_destinazione_nella_build)
 # I percorsi sorgente sono relativi al setup.py
